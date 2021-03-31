@@ -1,0 +1,30 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+        cors_allowed_origins:
+          - http://*
+          - https://*
+processors:
+  batch:
+extensions:
+  health_check: {}
+  zpages: {}
+exporters:
+  zipkin:
+    endpoint: "http://zipkin-all-in-one:9411/api/v2/spans"
+    format: proto
+  logging:
+    loglevel: info
+service:
+  extensions: [health_check, zpages]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [logging]
+      processors: []
+    traces:
+      receivers: [otlp]
+      processors: []
+      exporters: [logging, zipkin]

@@ -1,0 +1,81 @@
+version: "3.3"
+services:
+  traefik:
+    image: "traefik"
+    container_name: "traefik"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`dashboard.localhost.openiap.io`)"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik.middlewares=admin"
+      - "traefik.http.middlewares.admin.basicauth.users=admin:$$apr1$$iB.BZjJJ$$FmaZuX35eFCMe5t3a.OqR."
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.address=:80"
+
+      - --entrypoints.websecure.http.tls.certresolver=myresolver
+      - --certificatesresolvers.myresolver.acme.dnschallenge.provider=gcloud
+      - --certificatesresolvers.myresolver.acme.email=my@email.domain
+      - --certificatesresolvers.myresolver.acme.dnschallenge.resolvers=1.1.1.1
+      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+      # # middleware redirect
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      # # global redirect to https
+      # - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
+      # - "traefik.http.routers.redirs.entrypoints=web"
+      # - "traefik.http.routers.redirs.middlewares=redirect-to-https"
+    environment:
+      - GCE_PROJECT=apiproject-237214
+      - GCE_SERVICE_ACCOUNT_FILE=/letsencrypt/account.json
+      - DO_POLLING_INTERVAL=5
+      - DO_PROPAGATION_TIMEOUT=120
+      - DO_TTL=30
+    ports:
+      - "80:80"
+      - "443:443"
+      # - "8080:8080"
+    volumes:
+      - "./config:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  otelcollector:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.otelcollector.rule=Host(`otel.localhost.openiap.io`)"
+      - "traefik.http.routers.otelcollector.entrypoints=web,websecure"
+      - "traefik.http.services.otelcollector.loadbalancer.server.port=4317"
+      - "traefik.http.services.otelcollector.loadbalancer.server.scheme=h2c"
+    image: "otel/opentelemetry-collector"
+    container_name: "otelcollector"
+    restart: always
+    command: ["--config=/conf/collector-config.yaml"]
+    volumes:
+      - ./collector-config.yaml:/conf/collector-config.yaml
+    depends_on:
+      - zipkin-all-in-one
+      - jeager-all-in-one
+  zipkin-all-in-one:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.zipkin-all-in-one.rule=Host(`zipkin.localhost.openiap.io`)"
+      - "traefik.http.routers.zipkin-all-in-one.entrypoints=web,websecure"
+      - "traefik.frontend.passHostHeader=true"
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+  jeager-all-in-one:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jeager-all-in-one.rule=Host(`jeager.localhost.openiap.io`)"
+      - "traefik.http.routers.jeager-all-in-one.entrypoints=web,websecure"
+      - "traefik.frontend.passHostHeader=true"
+    image: jaegertracing/all-in-one
+    ports:
+      - "16686:16686"

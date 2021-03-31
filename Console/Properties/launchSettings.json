@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Examples.Console": {
+      "commandName": "Project",
+      "commandLineArgs": "otlp"
+    }
+  }
+}

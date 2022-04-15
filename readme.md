@@ -1,4 +1,4 @@
-### Continue {#activity_continue_helpurl}
+### Continue [activity_continue_helpurl] ##
 
 What:
 
